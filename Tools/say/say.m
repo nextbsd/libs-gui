@@ -1,15 +1,23 @@
 #import <AppKit/AppKit.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <getopt.h>
+
+static BOOL finished = NO;
+static BOOL spoke = NO;
 
 @interface SpeechDelegate : NSObject
 @end
 
 @implementation SpeechDelegate
+/* Called over Distributed Objects from inside the run loop: just note it.
+   Calling exit() here unwound the run loop's autorelease pools out of
+   order ("NSAutoreleasePool -dealloc of deallocated pool"). */
 - (void)speechSynthesizer: (NSSpeechSynthesizer*)sender 
         didFinishSpeaking: (BOOL)success
 {
-  exit((int)success);
+  spoke = success;
+  finished = YES;
 }
 @end
 
@@ -43,7 +51,16 @@ int main(int argc, char **argv)
   if (nil != inFile)
     {
       NSData *file = [NSData dataWithContentsOfFile: inFile];
-      words = [[NSString stringWithCString: [file bytes]] mutableCopy];
+
+      if (nil == file)
+        {
+          fprintf(stderr, "say: can't read %s\n", [inFile UTF8String]);
+          RELEASE(p);
+          return 1;
+        }
+      /* The file's bytes aren't NUL-terminated. */
+      words = AUTORELEASE([[NSMutableString alloc] initWithData: file
+        encoding: NSUTF8StringEncoding]);
     }
   else
     {
@@ -62,7 +79,14 @@ int main(int argc, char **argv)
     }
 
   say = [[NSSpeechSynthesizer alloc] initWithVoice: voice];
-  [say setDelegate: [SpeechDelegate new]];
+  if (nil == say)
+    {
+      fprintf(stderr, "say: the speech server isn't running and "
+        "couldn't be started\n");
+      RELEASE(p);
+      return 1;
+    }
+  [say setDelegate: AUTORELEASE([SpeechDelegate new])];
   if (nil != outFile)
     {
       [say startSpeakingString: words toURL: [NSURL fileURLWithPath: outFile]];
@@ -71,8 +95,15 @@ int main(int argc, char **argv)
     {
       [say startSpeakingString: words];
     }
-  [[NSRunLoop currentRunLoop] run];
-  // Not reached.
+  while (!finished)
+    {
+      CREATE_AUTORELEASE_POOL(loop);
+      [[NSRunLoop currentRunLoop]
+        runMode: NSDefaultRunLoopMode
+        beforeDate: [NSDate dateWithTimeIntervalSinceNow: 0.25]];
+      RELEASE(loop);
+    }
+  RELEASE(say);
   RELEASE(p);
-  return 0;
+  return spoke ? 0 : 1;
 }
