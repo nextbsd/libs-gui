@@ -33,6 +33,9 @@
 #import <Foundation/NSThread.h>
 #import <Foundation/NSError.h>
 #import <Foundation/NSConnection.h>
+#import <Foundation/NSEnumerator.h>
+#import <Foundation/NSFileManager.h>
+#import <Foundation/NSPathUtilities.h>
 #import "AppKit/NSWorkspace.h"
 #import "AppKit/NSSpeechSynthesizer.h"
 
@@ -117,7 +120,26 @@ static Class NSSpeechSynthesizerClass;
   if (nil == server)
     {
       NSWorkspace *ws = [NSWorkspace sharedWorkspace];
-      [ws launchApplication: @"GSSpeechServer"
+      NSFileManager *fm = [NSFileManager defaultManager];
+      NSEnumerator *e;
+      NSString *library;
+      NSString *path = nil;
+
+      /* The server is a background service in a Library's CoreServices
+         folder; an older install has it in Applications, found by name. */
+      e = [NSSearchPathForDirectoriesInDomains(NSLibraryDirectory,
+        NSAllDomainsMask, YES) objectEnumerator];
+      while (nil == path && (library = [e nextObject]) != nil)
+        {
+          NSString *candidate = [library stringByAppendingPathComponent:
+            @"CoreServices/GSSpeechServer.app"];
+
+          if ([fm fileExistsAtPath: candidate])
+            {
+              path = candidate;
+            }
+        }
+      [ws launchApplication: (path != nil ? path : @"GSSpeechServer")
                    showIcon: NO
                  autolaunch: NO];
     }
