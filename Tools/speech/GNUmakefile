@@ -11,6 +11,10 @@ VERSION = 0.1
 # interface for the GUI part of the speech engine.
 APP_NAME = GSSpeechServer
 GSSpeechServer_APPLICATION_ICON = SpeechSynthesizer.png
+# A background service, not an app people open: it goes with the other
+# services in the Library's CoreServices folder, where NSSpeechSynthesizer
+# launches it from, instead of in Applications.
+GSSpeechServer_INSTALL_DIR = $(GNUSTEP_LIBRARY)/CoreServices
 
 GSSpeechServer_RESOURCE_FILES = SpeechSynthesizer.png
 
