@@ -29,6 +29,7 @@ int main(int argc, char **argv)
   NSString *voice = nil;
   NSString *inFile = nil;
   NSSpeechSynthesizer *say;
+  SpeechDelegate *delegate;
   int ch;
   int i;
 
@@ -86,7 +87,10 @@ int main(int argc, char **argv)
       RELEASE(p);
       return 1;
     }
-  [say setDelegate: AUTORELEASE([SpeechDelegate new])];
+  /* Kept until the end: the synthesizer is a proxy for the speech
+     server's object and doesn't keep its delegate alive here. */
+  delegate = [SpeechDelegate new];
+  [say setDelegate: delegate];
   if (nil != outFile)
     {
       [say startSpeakingString: words toURL: [NSURL fileURLWithPath: outFile]];
@@ -95,15 +99,24 @@ int main(int argc, char **argv)
     {
       [say startSpeakingString: words];
     }
-  while (!finished)
+  /* The server says it's done from its speaking thread over Distributed
+     Objects, and that message can get lost, so also stop once the server
+     no longer says anything is speaking. Its speaking flag is set before
+     startSpeakingString: returns and cleared when the speech is over. */
+  while (!finished && [NSSpeechSynthesizer isAnyApplicationSpeaking])
     {
       CREATE_AUTORELEASE_POOL(loop);
       [[NSRunLoop currentRunLoop]
         runMode: NSDefaultRunLoopMode
-        beforeDate: [NSDate dateWithTimeIntervalSinceNow: 0.25]];
+        beforeDate: [NSDate dateWithTimeIntervalSinceNow: 0.1]];
       RELEASE(loop);
     }
+  if (!finished)
+    {
+      spoke = YES;
+    }
   RELEASE(say);
+  RELEASE(delegate);
   RELEASE(p);
   return spoke ? 0 : 1;
 }
