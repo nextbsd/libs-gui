@@ -2001,6 +2001,11 @@ static BOOL menuBarVisible = YES;
         {
           NSMenuView *newRep;
 
+          /* An open submenu belongs to the old representation: close it
+           * first, or its window stays on screen, empty, after the menu
+           * moves to its new style. */
+          [oldRep detachSubmenu];
+          [oldRep setHighlightedItemIndex: -1];
           if (oldStyle == NSWindows95InterfaceStyle)
             {
               /* Remove the menu from all main windows.
