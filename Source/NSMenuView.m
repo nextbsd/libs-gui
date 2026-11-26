@@ -2061,6 +2061,22 @@ static float menuBarHeight = 0.0;
         }
       [[[mainWindowMenuView menu] attachedMenu] close];
     }
+  else
+    {
+      /* Tracking began in a menu that a menu bar left open (its title
+         clicked, then an item clicked): close it from the bar, as a
+         choice made in one drag does, or it stays on screen. */
+      NSMenu *root = [self menu];
+
+      while ([root supermenu] != nil)
+        root = [root supermenu];
+      if (root != [self menu] && [[root menuRepresentation] isHorizontal]
+          && ![root isTransient])
+        {
+          [[root menuRepresentation] setHighlightedItemIndex: -1];
+          [[root attachedMenu] close];
+        }
+    }
 
   if ([self _executeItemAtIndex: indexOfActionToExecute
                   removeSubmenu: subMenusNeedRemoving] == NO)

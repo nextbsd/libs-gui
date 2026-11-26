@@ -40,6 +40,10 @@
 
 #import "NSToolbarFrameworkPrivate.h"
 #import "GSGuiPrivate.h"
+#import <objc/runtime.h>
+
+/* A main menu's item order before it became a horizontal bar. */
+static char GSMenuOrderKey;
 
 
 @interface NSWindow (Private)
@@ -234,6 +238,15 @@
         {
           NSMutableArray *itemsToMove;
 	  
+          /* Remember the menu's own order, so going back to a vertical
+             menu puts its items where they were (Info and Preferences at
+             the top, Quit at the bottom) rather than all at the end. */
+          if (objc_getAssociatedObject(menu, &GSMenuOrderKey) == nil)
+            {
+              objc_setAssociatedObject(menu, &GSMenuOrderKey,
+                [NSArray arrayWithArray: [menu itemArray]],
+                OBJC_ASSOCIATION_RETAIN);
+            }
           itemsToMove = [NSMutableArray new];
           
           if (appMenu == nil)
@@ -395,6 +408,32 @@
 
               [menu removeItem: appItem];
             }
+          /* Put the items back in the order they had before the menu
+             went horizontal; any added since keep their places after. */
+          {
+            NSArray *order = objc_getAssociatedObject(menu, &GSMenuOrderKey);
+            NSUInteger to = 0;
+            NSUInteger j;
+
+            for (j = 0; j < [order count]; j++)
+              {
+                id <NSMenuItem> anItem = [order objectAtIndex: j];
+                NSInteger from = [menu indexOfItem: anItem];
+
+                if (from < 0)
+                  continue;
+                if ((NSUInteger)from != to)
+                  {
+                    RETAIN(anItem);
+                    [menu removeItemAtIndex: from];
+                    [menu insertItem: anItem atIndex: to];
+                    RELEASE(anItem);
+                  }
+                to++;
+              }
+            objc_setAssociatedObject(menu, &GSMenuOrderKey, nil,
+                                     OBJC_ASSOCIATION_RETAIN);
+          }
         }  
     }
 
