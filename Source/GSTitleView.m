@@ -46,6 +46,11 @@
 #import "GNUstepGUI/GSTitleView.h"
 #import "GNUstepGUI/GSTheme.h"
 
+@interface GSTitleView (ThemeColors)
+- (void) _menuColorsFromTheme;
+- (void) _themeDidActivate: (NSNotification *)notification;
+@end
+
 @implementation GSTitleView
 
 // ============================================================================
@@ -144,28 +149,20 @@
     }
   else if ([owner isKindOfClass: [NSMenu class]])
     {
-      NSColor *textColor;
-      GSTheme *theme;
-
       NSDebugLLog(@"GSTitleView", @"owner is NSMenu");
       _owner = owner;
       _ownedByMenu = YES;
-      theme = [GSTheme theme];
-
-      RELEASE (titleColor);
-      titleColor = RETAIN ([theme colorNamed: @"GSMenuBar" state: GSThemeNormalState]);
-      if (titleColor == nil)
-	{
-	  titleColor = RETAIN ([NSColor blackColor]);
-	}
-
-      textColor = [theme colorNamed: @"GSMenuBarTitle" state: GSThemeNormalState];
-      if (textColor == nil)
-	{
-	  textColor = [NSColor whiteColor];
-	}
-      [textAttributes setObject: textColor 
-		      forKey: NSForegroundColorAttributeName];
+      [self _menuColorsFromTheme];
+      /* A theme activated while the menu is up (a light or dark
+         appearance chosen) brings its own colours: take them, or the
+         title keeps the old theme's, white on a white menu. */
+      [theCenter removeObserver: self
+                           name: GSThemeDidActivateNotification
+                         object: nil];
+      [theCenter addObserver: self
+                    selector: @selector(_themeDidActivate:)
+                        name: GSThemeDidActivateNotification
+                      object: nil];
     }
   else
     {
@@ -176,6 +173,37 @@
     }
 }
 
+/* A menu's title colours: the theme's GSMenuBar and GSMenuBarTitle. */
+- (void) _menuColorsFromTheme
+{
+  GSTheme *theme = [GSTheme theme];
+  NSColor *textColor;
+
+  RELEASE (titleColor);
+  titleColor = RETAIN ([theme colorNamed: @"GSMenuBar" state: GSThemeNormalState]);
+  if (titleColor == nil)
+    {
+      titleColor = RETAIN ([NSColor blackColor]);
+    }
+
+  textColor = [theme colorNamed: @"GSMenuBarTitle" state: GSThemeNormalState];
+  if (textColor == nil)
+    {
+      textColor = [NSColor whiteColor];
+    }
+  [textAttributes setObject: textColor
+                     forKey: NSForegroundColorAttributeName];
+}
+
+- (void) _themeDidActivate: (NSNotification *)notification
+{
+  if (_ownedByMenu)
+    {
+      [self _menuColorsFromTheme];
+      [self setNeedsDisplay: YES];
+    }
+}
+
 - (id) owner
 {
   return _owner;
@@ -183,10 +211,7 @@
 
 - (void) dealloc
 {
-  if (!_ownedByMenu)
-    {
-      [[NSNotificationCenter defaultCenter] removeObserver: self];
-    }
+  [[NSNotificationCenter defaultCenter] removeObserver: self];
 
   RELEASE(textAttributes);
   RELEASE(titleColor);
