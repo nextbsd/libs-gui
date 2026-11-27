@@ -176,7 +176,7 @@
   if (help == nil)
     {
       /* If there's no specification, we look for a files named
-       * "appname.rtfd" or "appname.rtf"
+       * "appname.help" (a help book), "appname.rtfd" or "appname.rtf"
        */
       help = [info objectForKey: @"NSExecutable"];
     }
@@ -188,7 +188,13 @@
       if ([[help pathExtension] length] == 0)
         {
           file = [mb pathForHelpResource:
-	    [help stringByAppendingPathExtension: @"rtfd"]];
+	    [help stringByAppendingPathExtension: @"help"]];
+
+          if (file == nil)
+            {
+              file = [mb pathForHelpResource:
+		[help stringByAppendingPathExtension: @"rtfd"]];
+            }
 
           if (file == nil)
             {
@@ -222,6 +228,17 @@
 		  if ([[viewer pathExtension] length] == 0)
 		    viewer = [viewer stringByAppendingPathExtension: @"app"];
 		  appInfo = [apps objectForKey: viewer];
+
+		  /* A viewer given by its full path is used as it is: an
+		   * app outside the Applications folders (such as one in
+		   * System/Library/CoreServices) isn't in the list of
+		   * registered applications.
+		   */
+		  if (nil == appInfo && [viewer isAbsolutePath]
+		    && [[NSFileManager defaultManager] fileExistsAtPath: viewer])
+		    {
+		      appInfo = [NSDictionary dictionary];
+		    }
 
 		  // We ingore the role, supposing both Editor and Viewer are fine
 		  if (nil == appInfo)
@@ -291,7 +308,20 @@
 	  }
 	}
     }
-  
+
+  /* No help of the app's own: the help viewer, if one is set, shows
+   * the help it has (the system's, on NextBSD).
+   */
+  {
+    NSString	*viewer = [[NSUserDefaults standardUserDefaults]
+      stringForKey: @"GSHelpViewer"];
+
+    if ([viewer length] > 0 && [viewer isEqual: @"NSHelpPanel"] == NO
+      && [[NSWorkspace sharedWorkspace] launchApplication: viewer])
+      {
+	return;
+      }
+  }
   NSBeep();
 }
 
