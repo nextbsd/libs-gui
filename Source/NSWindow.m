@@ -106,8 +106,11 @@
 #undef GSIArray
 #endif
 #include <GNUstepBase/GSIArray.h>
+#include <objc/runtime.h>
 
 static GSToolTips *toolTipVisible = nil;
+/* -zoom: keeps the frame it zoomed from here, to go back to. */
+static char zoomedFromKey;
 static id<GSWindowDecorator> windowDecorator = nil;
 
 
@@ -5531,8 +5534,17 @@ current key view.<br />
     && (fabs(NSMinX(maxRect) - NSMinX(_frame)) < DIST)
     && (fabs(NSMinY(maxRect) - NSMinY(_frame)) < DIST))
     {
-      // Already in zoomed mode, reset user frame, if stored
-      if (_autosaveName != nil)
+      NSValue *from = objc_getAssociatedObject(self, &zoomedFromKey);
+
+      // Already in zoomed mode: back to the frame it zoomed from, as on
+      // macOS, else the user frame, if stored
+      if (from != nil)
+        {
+          objc_setAssociatedObject(self, &zoomedFromKey, nil,
+                                   OBJC_ASSOCIATION_RETAIN);
+          [self setFrame: [from rectValue] display: YES];
+        }
+      else if (_autosaveName != nil)
         {
           [self setFrameUsingName: _autosaveName];
         }
@@ -5559,6 +5571,9 @@ current key view.<br />
       [self saveFrameUsingName: _autosaveName];
     }
 
+  objc_setAssociatedObject(self, &zoomedFromKey,
+                           [NSValue valueWithRect: _frame],
+                           OBJC_ASSOCIATION_RETAIN);
   [self setFrame: maxRect display: YES];
 }
 
